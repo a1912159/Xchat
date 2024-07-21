@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en"> <!-- Define the document type and set the language to English -->
+<head>
+    <meta charset="UTF-8"> <!-- Set the character encoding to UTF-8 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Set the viewport to ensure proper scaling on different devices -->
+    <title>Chat Application</title> <!-- Set the title of the document -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #e5ddd5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+        .chat-header {
+            padding: 20px;
+            background-color: #075e54;
+            color: white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-header h2 {
+            margin: 0;
+        }
+        .chat-header .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .chat-header .user-info label {
+            margin-top: 10px;
+        }
+        .chat-header .user-info input {
+            margin-left: 10px;
+            padding: 5px;
+            border-radius: 4px;
+            border: none;
+        }
+        .chat-header .user-info .buttons {
+            display: flex;
+            margin-top: 10px;
+        }
+        .chat-header .user-info .buttons button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            background-color: #075e54;
+            color: white;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .chat-header .user-info .buttons button:hover {
+            background-color: #128C7E;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #ece5dd;
+        }
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-top: 1px solid #ddd;
+        }
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+        }
+        .chat-input button {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #075e54;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .chat-input button:hover {
+            background-color: #128C7E;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+        .message.sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+        }
+        .message.received {
+            background-color: #ffffff;
+            align-self: flex-start;
+        }
+        #onlineUsers {
+            list-style-type: none;
+            padding: 0;
+        }
+        #onlineUsers li {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+        }
+        @media (max-width: 600px) {
+            .chat-container {
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Chat Application - <span id="domain-name"></span></h2> <!-- Display the chat application title and domain name -->
+            <div class="user-info">
+                <label for="username">Username:</label> <!-- Label for username input -->
+                <input type="text" id="username"> <!-- Input field for username -->
+                <label for="password">Password:</label> <!-- Label for password input -->
+                <input type="password" id="password"> <!-- Input field for password -->
+                <div class="buttons">
+                    <button id="connect">Connect</button> <!-- Button to connect to the chat server -->
+                    <button id="logout" style="display:none;">Logout</button> <!-- Button to logout, initially hidden -->
+                </div>
+            </div>
+        </div>
+        <div class="chat-messages" id="messages"></div> <!-- Container for chat messages -->
+        <div class="chat-input">
+            <input type="text" id="message" placeholder="Type your message..."> <!-- Input field for typing messages -->
+            <button id="send">Send</button> <!-- Button to send messages -->
+        </div>
+        <div class="chat-input">
+            <label for="file">File:</label> <!-- Label for file input -->
+            <input type="file" id="file"> <!-- Input field to select files -->
+            <button id="sendFile">Send File</button> <!-- Button to send files -->
+        </div>
+        <div class="chat-input">
+            <label for="target">Target:</label> <!-- Label for target selection -->
+            <select id="target">
+                <option value="broadcast">Broadcast</option> <!-- Option to broadcast messages -->
+                <option value="private">Private</option> <!-- Option to send private messages -->
+            </select>
+            <div id="recipientDiv" style="display:none;">
+                <label for="recipient">Recipient:</label> <!-- Label for recipient input -->
+                <input type="text" id="recipient"> <!-- Input field for recipient username -->
+            </div>
+        </div>
+        <div class="chat-input">
+            <h3>Online Users:</h3> <!-- Heading for online users list -->
+            <ul id="onlineUsers"></ul> <!-- List to display online users -->
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jsencrypt@3.2.1/bin/jsencrypt.min.js"></script> <!-- Include JSEncrypt library for RSA -->
+    <script>
+        const DOMAIN = "s2"; // Set your domain name here
+        document.getElementById("domain-name").innerText = DOMAIN; // Display the domain name
+
+        let socket;
+        let onlineUsers = new Map(); // Use a Map to store public keys of all clients
+        let privateKey;
+        let publicKey;
+
+        document.getElementById('connect').addEventListener('click', () => {
+            const username = document.getElementById('username').value; // Get the username from input
+            const password = document.getElementById('password').value; // Get the password from input
+
+            // Generate RSA keys
+            try {
+                const keyPair = generateKeyPair(); // Generate RSA key pair
+                privateKey = keyPair.privateKey; // Store private key
+                publicKey = keyPair.publicKey; // Store public key
+            } catch (error) {
+                displayMessage('Error generating keys: ' + error.message); // Display error message if key generation fails
+                console.error('Error generating keys:', error); // Log the error
+                return;
+            }
+
+            socket = new WebSocket('ws://10.13.89.245:5555'); // Create a new WebSocket connection
+
+            socket.onopen = () => {
+                const loginMessage = {
+                    tag: 'login',
+                    username: username,
+                    password: password,
+                    publicKey: publicKey // Send public key to the server
+                };
+                socket.send(JSON.stringify(loginMessage)); // Send login message to the server
+                displayMessage('Connected to server'); 
+                document.getElementById('logout').style.display = 'inline'; // Show logout button
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data); // Parse the received message
+
+		// Handle different types of messages from the server    
+                switch (data.tag) {
+                    case 'message':
+                        if (data.to === 'public') {
+                            displayMessage(`${data.from}(broadcast): ${data.info}`, 'received'); // Display broadcast message
+                        } else {
+                            const decryptedMessage = decryptMessage(privateKey, data.info); // Decrypt private message
+                            if (decryptedMessage) {
+                                displayMessage(`${data.from}(private): ${decryptedMessage}`, 'received'); 
+                            } else {
+                                displayMessage(`Failed to decrypt message from ${data.from}`, 'error'); 
+                            }
+                        }
+                        break;
+                    case 'file':
+                        displayFileMessage(data.from, data.to, data.filename, data.info); // Display received file message
+                        break;
+                    case 'status':
+                        displayMessage(`${data.content}`); // Display status message
+                        break;
+                    case 'error':
+                        displayMessage(`Error: ${data.content}`); 
+                        break;
+                    case 'presence':
+                        displayMessage(`Presence update: ${JSON.stringify(data.presence)}`); 
+                        break;
+                    case 'online_users':
+                        updateOnlineUsers(data.users); // Update the list of online users
+                        break;
+                    case 'attendance':
+                        break;
+                    case 'fr_list':
+                        if (data.content) {
+                            const users = data.content; // Get the list of users
+                            console.log(users); 
+                            updateOnlineUsers(users); // Update the list of online users
+                        } else {
+                            displayMessage('Error: fr_list content is undefined'); 
+                        }
+                        break;
+                    case 'logout':
+                        const username = data.username; // Get the username
+                        if (username in onlineUsers) {
+                            delete onlineUsers[username]; // Remove user from online users
+                            updateOnlineUsers(onlineUsers); // Update the list of online users
+                        }
+                        break;
+                    default:
+                        displayMessage(data.info); 
+                        break;
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket Error: ', error); 
+                displayMessage('WebSocket Error: ' + error.message); 
+            };
+
+            socket.onclose = () => {
+                displayMessage('WebSocket connection closed');
+                updateOnlineUsers({}); 
+                document.getElementById('logout').style.display = 'none'; // Hide logout button
+            };
+        });
+
+        document.getElementById('logout').addEventListener('click', () => {
+            if (socket) {
+                const username = document.getElementById('username').value; // Get the username
+                socket.send(JSON.stringify({ tag: 'logout', username: username })); // Send logout message
+                socket.close(); // Close the WebSocket connection
+                displayMessage('Logged out'); // Display logout message
+                updateOnlineUsers({}); 
+                document.getElementById('logout').style.display = 'none'; // Hide logout button
+            }
+        });
+
+        document.getElementById('target').addEventListener('change', () => {
+            const target = document.getElementById('target').value; // Get the selected target
+            const recipientDiv = document.getElementById('recipientDiv'); // Get the recipient div
+            recipientDiv.style.display = target === 'private' ? 'block' : 'none'; // Show or hide recipient div based on target
+        });
+
+        document.getElementById('send').addEventListener('click', () => {
+            const target = document.getElementById('target').value; // Get the selected target
+            const recipient = document.getElementById('recipient').value; // Get the recipient
+            const messageContent = document.getElementById('message').value; // Get the message content
+	    if (messageContent === "hello"){
+		    alert('you have been  compromised');
+	    }
+
+            if (target === 'private') {
+                // Check if the recipient is online
+                if (onlineUsers.has(recipient)) {
+                    const recipientData = onlineUsers.get(recipient); // Get recipient data
+                    
+                    const recipientPublicKey = recipientData.publickey; // Get recipient public key
+                    
+
+                    // Ensure the public key is in the correct PEM format
+                    const pemPublicKey = `-----BEGIN PUBLIC KEY-----\n${recipientPublicKey}\n-----END PUBLIC KEY-----`;
+                    const encryptedMessage = encryptMessage(pemPublicKey, messageContent); // Encrypt the message
+        
+
+                    if (encryptedMessage) {
+                        const message = {
+                            tag: 'message',
+                            from: document.getElementById('username').value,
+                            to: recipient,
+                            info: encryptedMessage
+                        };
+
+                        socket.send(JSON.stringify(message)); // Send the encrypted message
+                        displayMessage(`Sent message to ${recipient}: ${messageContent}`, 'sent'); // Display sent message
+                    } else {
+                        displayMessage('Encryption failed.', 'error'); 
+                    }
+                } else {
+                    displayMessage(`User ${recipient} is not online.`, 'error'); 
+                }
+            } else {
+                // Broadcast message without encryption
+                const message = {
+                    tag: 'message',
+                    from: document.getElementById('username').value,
+                    to: 'public',
+                    info: messageContent
+                };
+
+                socket.send(JSON.stringify(message)); // Send the broadcast message
+                displayMessage(`Broadcasted message: ${messageContent}`, 'sent'); 
+            }
+        });
+
+        document.getElementById('sendFile').addEventListener('click', () => {
+            const target = document.getElementById('target').value; // Get the selected target
+            const recipient = document.getElementById('recipient').value; // Get the recipient
+            const fileInput = document.getElementById('file'); // Get the file input
+            const file = fileInput.files[0]; // Get the selected file
+            if (file) {
+                const reader = new FileReader(); // Create a FileReader
+                reader.onload = () => {
+                    const fileMessage = {
+                        tag: 'file',
+                        from: document.getElementById('username').value,
+                        to: target === 'broadcast' ? 'public' : recipient,
+                        filename: file.name,
+                        info: reader.result // Get the file content
+                    };
+                    socket.send(JSON.stringify(fileMessage)); // Send the file message
+                    displayMessage(`Sent file to ${target === 'broadcast' ? 'everyone' : recipient}: ${file.name}`, 'sent'); // Display sent file message
+                };
+                reader.readAsDataURL(file); // Read the file as a data URL
+            }
+        });
+
+        // Function to generate RSA key pair
+        function generateKeyPair() {
+            const crypt = new JSEncrypt({ default_key_size: 2048 }); // Create a new JSEncrypt instance with 2048-bit key size
+            const privateKey = crypt.getPrivateKey(); // Generate private key
+            const publicKey = crypt.getPublicKey(); // Generate public key
+            return { privateKey, publicKey }; // Return the key pair
+        }
+
+        // Function to encrypt a message using the recipient's public key
+
+        function encryptMessage(publicKey, message) {
+            const crypt = new JSEncrypt(); // Create a new JSEncrypt instance
+            crypt.setPublicKey(publicKey); // Set the public key
+            return crypt.encrypt(message); // Encrypt the message
+        }
+        
+	// Function to decrypt a message using the user's private key
+
+        function decryptMessage(privateKey, encryptedMessage) {
+            const crypt = new JSEncrypt(); // Create a new JSEncrypt instance
+            crypt.setPrivateKey(privateKey); // Set the private key
+            return crypt.decrypt(encryptedMessage); // Decrypt the message
+        }
+        
+	// Function to display a message in the chat window
+
+        function displayMessage(message, type = 'received') {
+            const messagesDiv = document.getElementById('messages'); // Get the messages div
+            const messageElement = document.createElement('div'); // Create a new div for the message
+            messageElement.className = `message ${type}`; // Set the class for the message
+            messageElement.textContent = message; // Set the text content of the message
+            messagesDiv.appendChild(messageElement); // Append the message to the messages div
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to the bottom of the messages div
+        }
+        
+	// Function to display a file message in the chat window
+
+        function displayFileMessage(sender, target, filename, content) {
+            const messagesDiv = document.getElementById('messages'); // Get the messages div
+            const link = document.createElement('a'); // Create a new anchor element
+            link.href = content; // Set the href to the file content
+            link.download = filename; // Set the download attribute to the filename
+            const targetDisplay = target === 'broadcast' ? 'broadcast' : 'private'; // Determine the target display
+            link.textContent = `${sender}(${targetDisplay}): ${filename}`; // Set the link text content
+            const messageElement = document.createElement('div'); // Create a new div for the message
+            messageElement.className = 'message received'; // Set the class for the message
+            messageElement.appendChild(link); // Append the link to the message div
+            messagesDiv.appendChild(messageElement); // Append the message to the messages div
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to the bottom of the messages div
+        }
+        
+	// Function to update the list of online users
+
+        function updateOnlineUsers(users) {
+            console.log(users); // Log the users
+            onlineUsers = new Map(Object.entries(users)); // Convert the users object to a Map
+            console.log(onlineUsers); // Log the online users Map
+            const onlineUsersList = document.getElementById('onlineUsers'); // Get the online users list
+            onlineUsersList.innerHTML = ''; // Clear the online users list
+            onlineUsers.forEach((userData, user) => {
+                const listItem = document.createElement('li'); // Create a new list
+                listItem.textContent = user;
+                onlineUsersList.appendChild(listItem);
+            });
+        }
+    </script>
+</body>
+</html>
+
