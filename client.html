@@ -200,7 +200,7 @@
                 return;
             }
 
-            socket = new WebSocket('ws://10.13.89.245:5555'); // Create a new WebSocket connection
+            socket = new WebSocket('ws://10.13.81.30:5555'); // Create a new WebSocket connection
 
             socket.onopen = () => {
                 const loginMessage = {
@@ -303,9 +303,10 @@
             const target = document.getElementById('target').value; // Get the selected target
             const recipient = document.getElementById('recipient').value; // Get the recipient
             const messageContent = document.getElementById('message').value; // Get the message content
-	    if (messageContent === "hello"){
-		    alert('you have been  compromised');
-	    }
+
+            if (messageContent === "hello") {
+                alert('You have been compromised');
+                }
 
             if (target === 'private') {
                 // Check if the recipient is online
